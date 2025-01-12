@@ -4,10 +4,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <errno.h>
 
 
 #define Char_Length 360
-#define File_Folder_Length 50
+#define File_Folder_Length Char_Length 
 
 void delete_subDir(char inputDir[]);
 void delete_subFiles(char inputDir[]);
@@ -20,16 +21,28 @@ void createDir_and_File(char inputDir[], int mode);
 int isDots(char dirName[]);
 void options(char inputDir[]);
 DIR * inputDirectory(char inputDir[]);
-void exit_if_null(void *ptr, char *message);
+void exit_if_null(void *ptr, char *message, char ch[]);
 void clearInputBuffer();
 
-int main(){
+int main(int argc,char* argv[]){
     int menuChoice;
     DIR *dir=NULL;
+    char *temp=NULL;
     char inputDir[Char_Length]={'\0'};
-    dir=inputDirectory(inputDir);
+    
+    if(argc==1){
+        dir=inputDirectory(inputDir);
+        options(inputDir);
+    }else if(argc==2){
+        temp=argv[1];
+        dir=opendir(temp);
+        exit_if_null(dir,"Cheak your directory and try again",temp);
+        options(temp);
+    }else{
+        printf("Too many arguments.");
+        exit(1);
+    }
 
-    options(inputDir);
 
     while(1){
         do{
@@ -84,9 +97,14 @@ int main(){
     return 0;
 }
 
-void exit_if_null(void *ptr, char *message){
+void exit_if_null(void *ptr, char *message, char ch[]){
+
+
     if(ptr==NULL){
         perror(message);
+        if (ch!=NULL){
+            printf("%s",ch);
+        }
         exit(1);
     }
 }
@@ -115,7 +133,7 @@ void viewFile_and_Dir(DIR *dir,int mode,char inputDir[]){
     while( (entry=readdir(dir)) != NULL ){
         snprintf(tempPath, Char_Length, "%s/%s", inputDir, entry->d_name);
         if(stat(tempPath,&pathTypeStruct)==1){ // save info of the given path (dir) into the structure (pathType)
-            exit_if_null(NULL,"Problem finding some path");
+            exit_if_null(NULL,"Problem finding some path",tempPath);
         } 
         if(!isDots(entry->d_name)){
             switch(mode){
@@ -138,7 +156,7 @@ void viewFile_and_Dir(DIR *dir,int mode,char inputDir[]){
                 }
                 break;
                 default:
-                exit_if_null(NULL,"Error: ");
+                exit_if_null(NULL,"Error: ",NULL);
                 break;
             }
         }
@@ -153,7 +171,7 @@ void options(char inputDir[]){
 }
 
 int isDots(char dirName[]){
-    int index=strcspn(dirName,"\0");
+    size_t index=strcspn(dirName,"\0");
     if(dirName[index-1]=='.'){
         return 1;
     }
@@ -161,8 +179,8 @@ int isDots(char dirName[]){
 }
 
 void clearInputBuffer(){
-    char ch;
-    while(ch=getchar()!='\n'&&ch!=EOF); // clean up input buffer for fgets
+    int ch;
+    while((ch=getchar())!='\n'&&ch!=EOF); // clean up input buffer for fgets
 }
 
 void createDir_and_File(char inputDir[],int mode){
@@ -177,20 +195,32 @@ void createDir_and_File(char inputDir[],int mode){
     fgets(file_folder_name,File_Folder_Length,stdin);
     //clearInputBuffer();
     
-    int len=strlen(file_folder_name);//fgets also inputs the enter '\n' into the array.
+    size_t len=strlen(file_folder_name);//fgets also inputs the enter '\n' into the array.
     file_folder_name[len-1]='\0'; // removing '\n'
+    FILE *file;
 
-    snprintf(tempDirOrFile,Char_Length,"%s/%s",inputDir,file_folder_name);
+    snprintf(tempDirOrFile,Char_Length+2,"%s/%s",inputDir,file_folder_name);
     switch(mode){
         case 2:
-        if (mkdir(tempDirOrFile)){
+        if (
+            mkdir(
+                tempDirOrFile
+
+                // #ifndef _WIN32 //don't think it makes sense to do this
+                // ,S_IRWXU
+                // #endif
+
+            )
+
+            )
+        {
             perror("\nAttempt at creating folder has been unsucessfull");
         }else{
             printf(" \nFolder creation sucessfull\n");
         }
         break;
         case 4:
-        FILE *file=fopen(tempDirOrFile,"w");
+        file=fopen(tempDirOrFile,"w");
         if (file==NULL){
             perror("\nAttempt at creating file has been unsucessfull");
         }else{
@@ -211,7 +241,7 @@ void deleteFile(char inputDir[]){
     printf("input file you want to delete: ");
     fgets(ch,Char_Length,stdin);
     ch[strcspn(ch,"\n")]='\0';
-    snprintf(tempPath, Char_Length, "%s/%s", inputDir, ch);
+    snprintf(tempPath, Char_Length+2, "%s/%s", inputDir, ch);
     
     if((remove(tempPath))!=0){
         printf("Could not delete the file. cheak and try again.");
@@ -225,7 +255,7 @@ void deleteDir(char inputDir[]){
     printf("input folder you want to delete: ");
     fgets(ch,Char_Length,stdin);
     ch[strcspn(ch,"\n")]='\0';
-    snprintf(tempPath, Char_Length, "%s/%s", inputDir, ch);
+    snprintf(tempPath, Char_Length+2, "%s/%s", inputDir, ch);
     
     if((rmdir(tempPath))!=0){
         printf("Could not delete the folder because \n Error code: %d.",errno);
@@ -242,40 +272,44 @@ void deleteDir(char inputDir[]){
         }
         return;
     }
-    printf("The file was removed sucessfully");
+    printf("The folder was removed sucessfully");
 }
 
 void delete_subFiles(char tempPath[]){
     DIR *dir=opendir(tempPath);
-    exit_if_null(dir,"Couldn't delete folder");
+    exit_if_null(dir,"Couldn't open folder",tempPath);
     struct dirent *entry;
     struct stat pathTypeStruct; // struct for stats for whatever is gonna get cheaked
     char tempPathII[Char_Length];
     
     while((entry=readdir(dir)) != NULL){
         snprintf(tempPathII, Char_Length, "%s/%s", tempPath, entry->d_name);
+        
         if(stat(tempPathII,&pathTypeStruct)==1){ // save info of the given path (dir) into the structure (pathType)
-            exit_if_null(NULL,"Problem finding some path");
-        } 
-        if(!isDots(entry->d_name)){
-            if(S_ISREG(pathTypeStruct.st_mode)){ // returns 1 if it's a file
+            exit_if_null(NULL,"Problem finding some path",tempPathII);
+        }
 
+        if(!isDots(entry->d_name)){
+
+            if(S_ISREG(pathTypeStruct.st_mode)){ // returns 1 if it's a file
                 if((remove(tempPathII))!=0){
                     printf("Could not delete the file. cheak and try again.");
                     return;
                 }
+            }
 
-            }else if(S_ISDIR(pathTypeStruct.st_mode)){ // returns if it's a directory
+            if(S_ISDIR(pathTypeStruct.st_mode)){ // returns if it's a directory
                 delete_subFiles(tempPathII);
-            }else{}
+            }
         }
+
     }
     closedir(dir);
 }
 
 void delete_subDir(char tempPath[]){
     DIR *dir=opendir(tempPath);
-    exit_if_null(dir,"Couldn't delete folder");
+    exit_if_null(dir,"Couldn't delete folder: %s",tempPath);
 
 
     struct dirent *entry;
@@ -285,17 +319,17 @@ void delete_subDir(char tempPath[]){
     while((entry=readdir(dir)) != NULL){
         snprintf(tempPathII, Char_Length, "%s/%s",tempPath, entry->d_name);
         if(stat(tempPathII,&pathTypeStruct)==1){
-            exit_if_null(NULL,"Problem finding some path");
+            exit_if_null(NULL,"Problem finding some path",tempPathII);
         } 
         if(!isDots(entry->d_name)){
             if(S_ISREG(pathTypeStruct.st_mode)){ 
-                printf("Some error occured");
-                return;
-            }else if(S_ISDIR(pathTypeStruct.st_mode)){
+                exit_if_null(NULL,"Some error occured",NULL);
+            }
+            if(S_ISDIR(pathTypeStruct.st_mode)){
                 if((rmdir(tempPathII))!=0){
                     delete_subDir(tempPathII);
                 }
-            }else{}
+            }
         }
     }
     rmdir(tempPath);

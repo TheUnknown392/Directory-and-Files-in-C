@@ -7,8 +7,8 @@
 #include <errno.h>
 
 
-#define Char_Length 360
-#define File_Folder_Length Char_Length 
+#define File_Folder_Length 360
+#define  Char_Length File_Folder_Length+3
 
 void delete_subDir(char inputDir[]);
 void delete_subFiles(char inputDir[]);
@@ -28,7 +28,7 @@ int main(int argc,char* argv[]){
     int menuChoice;
     DIR *dir=NULL;
     char *temp=NULL;
-    char inputDir[Char_Length]={'\0'};
+    char inputDir[Char_Length-3]={'\0'};
     
     if(argc==1){
         dir=inputDirectory(inputDir);
@@ -131,7 +131,7 @@ void viewFile_and_Dir(DIR *dir,int mode,char inputDir[]){
     char tempPath[Char_Length];
     
     while( (entry=readdir(dir)) != NULL ){
-        snprintf(tempPath, Char_Length, "%s/%s", inputDir, entry->d_name);
+        snprintf(tempPath, Char_Length, "%s//%s", inputDir, entry->d_name);
         if(stat(tempPath,&pathTypeStruct)==1){ // save info of the given path (dir) into the structure (pathType)
             exit_if_null(NULL,"Problem finding some path",tempPath);
         } 
@@ -199,7 +199,7 @@ void createDir_and_File(char inputDir[],int mode){
     file_folder_name[len-1]='\0'; // removing '\n'
     FILE *file;
 
-    snprintf(tempDirOrFile,Char_Length+2,"%s/%s",inputDir,file_folder_name);
+    snprintf(tempDirOrFile,Char_Length,"%s//%s",inputDir,file_folder_name);
     switch(mode){
         case 2:
         if (
@@ -241,10 +241,10 @@ void deleteFile(char inputDir[]){
     printf("input file you want to delete: ");
     fgets(ch,Char_Length,stdin);
     ch[strcspn(ch,"\n")]='\0';
-    snprintf(tempPath, Char_Length+2, "%s/%s", inputDir, ch);
+    snprintf(tempPath, Char_Length, "%s//%s", inputDir, ch);
     
     if((remove(tempPath))!=0){
-        printf("Could not delete the file. cheak and try again.");
+        perror("Could not delete the file. cheak and try again");
         return;
     }
     printf("The file was removed sucessfully");
@@ -255,10 +255,11 @@ void deleteDir(char inputDir[]){
     printf("input folder you want to delete: ");
     fgets(ch,Char_Length,stdin);
     ch[strcspn(ch,"\n")]='\0';
-    snprintf(tempPath, Char_Length+2, "%s/%s", inputDir, ch);
+    snprintf(tempPath, Char_Length, "%s//%s", inputDir, ch);
     
     if((rmdir(tempPath))!=0){
-        printf("Could not delete the folder because \n Error code: %d.",errno);
+        printf("Could not delete the folder because \n Error code: %d",errno);
+        perror(" || Reason");
         if(errno==ENOTEMPTY){
             printf("\nSubfolders and/or files found. Do you want to delete all subfolders and files? y/n: ");
             scanf("%c",&c);
@@ -283,7 +284,7 @@ void delete_subFiles(char tempPath[]){
     char tempPathII[Char_Length];
     
     while((entry=readdir(dir)) != NULL){
-        snprintf(tempPathII, Char_Length, "%s/%s", tempPath, entry->d_name);
+        snprintf(tempPathII, Char_Length, "%s//%s", tempPath, entry->d_name);
         
         if(stat(tempPathII,&pathTypeStruct)==1){ // save info of the given path (dir) into the structure (pathType)
             exit_if_null(NULL,"Problem finding some path",tempPathII);
@@ -293,7 +294,7 @@ void delete_subFiles(char tempPath[]){
 
             if(S_ISREG(pathTypeStruct.st_mode)){ // returns 1 if it's a file
                 if((remove(tempPathII))!=0){
-                    printf("Could not delete the file. cheak and try again.");
+                    perror("Could not delete the file. cheak and try again.");
                     return;
                 }
             }
@@ -317,7 +318,7 @@ void delete_subDir(char tempPath[]){
     char tempPathII[Char_Length];
 
     while((entry=readdir(dir)) != NULL){
-        snprintf(tempPathII, Char_Length, "%s/%s",tempPath, entry->d_name);
+        snprintf(tempPathII, Char_Length, "%s//%s",tempPath, entry->d_name);
         if(stat(tempPathII,&pathTypeStruct)==1){
             exit_if_null(NULL,"Problem finding some path",tempPathII);
         } 
